@@ -6,6 +6,7 @@
     <title>Autos Colombia | Parqueadero</title>
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     
     <style>
         body {
@@ -106,6 +107,14 @@
                             <label class="form-label text-muted">Nombre del Propietario</label>
                             <input type="text" class="form-control bg-light" id="nombrePropietario" required>
                         </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label small">Operario de Turno</label>
+                            <select class="form-select" id="operario" required>
+                                <option value="" selected disabled>Seleccionar operario...</option>
+                                <option value="1">Operario 1 · Puerta 1</option>
+                                <option value="2">Operario 2 · Puerta 2</option>
+                            </select>
+                        </div>
                         <div class="col-12 text-end mt-4">
                             <button type="submit" class="btn btn-primary btn-lg px-5">Guardar Ingreso</button>
                         </div>
@@ -147,6 +156,44 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- Ventana de resultado: sirve para ingreso exitoso, salida exitosa y errores -->
+    <div class="modal fade" id="modalResultado" tabindex="-1" aria-labelledby="resultadoTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow" style="border-radius: 18px;">
+                <div class="modal-body p-4 p-md-5 text-center">
+                    <div id="resultadoIcono" class="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle fs-1 fw-bold" style="width: 72px; height: 72px;" aria-hidden="true"></div>
+                    <h4 class="fw-bold mb-1" id="resultadoTitulo"></h4>
+                    <p class="text-muted mb-0" id="resultadoMensaje"></p>
+
+                    <div id="resultadoCelda" class="bg-dark text-white rounded-4 py-3 mx-auto mt-4 d-none" style="max-width: 260px;">
+                        <div class="small" id="resultadoCeldaEtiqueta">Celda asignada</div>
+                        <div class="display-5 fw-bold" id="resultadoCeldaCodigo"></div>
+                    </div>
+
+                    <dl id="resultadoDatos" class="text-start mt-4 mb-0 d-none"></dl>
+
+                    <button type="button" class="btn btn-primary px-5 mt-4" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ventana para confirmar una salida -->
+    <div class="modal fade" id="modalConfirmarSalida" tabindex="-1" aria-labelledby="confirmarSalidaTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow" style="border-radius: 18px;">
+                <div class="modal-body p-4 p-md-5 text-center">
+                    <h4 class="fw-bold mb-2" id="confirmarSalidaTitulo">¿Registrar la salida?</h4>
+                    <p class="text-muted" id="confirmarSalidaTexto"></p>
+                    <div class="d-flex justify-content-center gap-2 mt-4">
+                        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger px-4" id="btnConfirmarSalida">Confirmar salida</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts de Bootstrap y nuestra App -->

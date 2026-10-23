@@ -27,4 +27,5 @@ public class Usuario {
     public Long getId() { return id; }
     public String getCedula() { return cedula; }
     public String getNombre() { return nombre; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
 }

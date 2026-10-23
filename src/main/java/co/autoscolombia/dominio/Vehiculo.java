@@ -45,4 +45,5 @@ public class Vehiculo {
     public String getColor() { return color; }
     public TipoVehiculo getTipo() { return tipo; }
     public Usuario getPropietario() { return propietario; }
+    public void setPropietario(Usuario propietario) { this.propietario = propietario; }
 }
