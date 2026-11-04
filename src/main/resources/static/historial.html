@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial | Autos Colombia</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Efecto de animación para el carro */
+        .carro-animado {
+            width: 250px;
+            transition: transform 0.8s ease-in-out;
+            cursor: pointer;
+        }
+        .carro-animado:hover {
+            transform: translateX(100px); /* El carro se mueve a la derecha al pasar el mouse */
+        }
+        /* Estilos para las tarjetas y paneles */
+        .tarjeta-premium {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .encabezado-app {
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            color: white;
+            padding: 2rem 0;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Encabezado con Carro Animado -->
+    <header class="encabezado-app text-center shadow">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="text-start">
+                <h1 class="fw-bold">Autos Colombia</h1>
+                <p class="mb-0 fs-5">Sistema Inteligente de Parqueadero</p>
+            </div>
+            <!-- Imagen del carro que se mueve -->
+            <div>
+                <img src="https://cdn-icons-png.flaticon.com/512/3202/3202926.png" alt="Carro animado" class="carro-animado">
+            </div>
+        </div>
+    </header>
+
+    <div class="container mb-5">
+
+        <div class="card tarjeta-premium">
+            <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                <span>🕘 Historial de Movimientos</span>
+                <a href="/" class="btn btn-sm btn-outline-light">← Volver al panel</a>
+            </div>
+
+            <div class="card-body bg-white border-bottom">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="btn-group" role="group" aria-label="Filtrar por estado" id="filtros">
+                        <button type="button" class="btn btn-primary" data-filtro="TODOS">Todos (0)</button>
+                        <button type="button" class="btn btn-outline-primary" data-filtro="ACTIVA">Activas (0)</button>
+                        <button type="button" class="btn btn-outline-primary" data-filtro="FINALIZADA">Finalizadas (0)</button>
+                    </div>
+                    <input type="search" class="form-control bg-light" id="buscar" placeholder="Buscar por placa..." style="max-width: 280px;">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Placa</th>
+                            <th>Tipo</th>
+                            <th>Propietario</th>
+                            <th>Celda</th>
+                            <th>Estado</th>
+                            <th>Fecha de entrada</th>
+                            <th>Fecha de salida</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial">
+                        <tr><td colspan="7" class="text-center py-3 text-muted">Cargando historial...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-footer bg-white small text-muted d-flex flex-wrap gap-4">
+                <span><span class="badge bg-success">Activa</span> el vehículo sigue dentro, sin fecha de salida</span>
+                <span><span class="badge bg-secondary">Finalizada</span> ya salió, con fecha de salida</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/historial.js"></script>
+</body>
+</html>

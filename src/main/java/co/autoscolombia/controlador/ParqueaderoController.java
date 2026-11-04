@@ -69,6 +69,12 @@ public class ParqueaderoController {
         return celdaRepository.findAll();
     }
 
+    // Historial de movimientos (HU-07): ocupaciones activas y finalizadas
+    @GetMapping("/historial")
+    public List<Map<String, Object>> obtenerHistorial() {
+        return servicioParqueadero.consultarHistorial();
+    }
+
     // 3. Recibe los datos del formulario web y registra el ingreso
     @PostMapping("/ingreso")
     public ResponseEntity<Map<String, String>> registrarIngreso(@RequestBody Map<String, String> datos) {

@@ -17,11 +17,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 public class ServicioParqueadero {
+
+    // Formatos válidos (RF-03)
+    private static final Pattern PLACA_CARRO = Pattern.compile("^[A-Z]{3}\\d{3}$");
+    private static final Pattern PLACA_MOTO = Pattern.compile("^[A-Z]{3}\\d{2}[A-Z]?$");
+    private static final Pattern CEDULA = Pattern.compile("^\\d{6,10}$");
+    private static final Pattern NOMBRE = Pattern.compile("^\\p{L}[\\p{L} .'-]+$");
+    private static final Pattern TEXTO = Pattern.compile("^[\\p{L}\\p{N}][\\p{L}\\p{N} .-]*$");
 
     private final CeldaRepository celdaRepository;
     private final VehiculoRepository vehiculoRepository;
@@ -86,13 +96,30 @@ public class ServicioParqueadero {
             throw new Exception("Debes ingresar los datos del vehículo.");
         }
 
-        String placa = validarTexto(vehiculo.getPlaca(), "placa", 10)
-                .toUpperCase(Locale.ROOT);
-        String marca = validarTexto(vehiculo.getMarca(), "marca", 60);
-        String color = validarTexto(vehiculo.getColor(), "color", 40);
         TipoVehiculo tipo = vehiculo.getTipo();
         if (tipo == null) {
             throw new Exception("Debes seleccionar el tipo de vehículo.");
+        }
+
+        String placa = normalizarPlaca(
+                validarTexto(vehiculo.getPlaca(), "placa", 10));
+        Pattern formatoPlaca = tipo == TipoVehiculo.CARRO
+                ? PLACA_CARRO : PLACA_MOTO;
+        if (!formatoPlaca.matcher(placa).matches()) {
+            throw new Exception(
+                    "La placa " + placa + " no es válida. "
+                            + (tipo == TipoVehiculo.CARRO
+                            ? "Un carro usa 3 letras y 3 números (ej: ABC123)."
+                            : "Una moto usa 3 letras, 2 números y 1 letra (ej: ABC12D)."));
+        }
+
+        String marca = validarTexto(vehiculo.getMarca(), "marca", 60);
+        if (!TEXTO.matcher(marca).matches()) {
+            throw new Exception("La marca solo puede tener letras, números y espacios.");
+        }
+        String color = validarTexto(vehiculo.getColor(), "color", 40);
+        if (!TEXTO.matcher(color).matches()) {
+            throw new Exception("El color solo puede tener letras, números y espacios.");
         }
 
         Usuario propietarioIngresado = vehiculo.getPropietario();
@@ -101,8 +128,14 @@ public class ServicioParqueadero {
         }
         String cedula = validarTexto(
                 propietarioIngresado.getCedula(), "cédula", 30);
+        if (!CEDULA.matcher(cedula).matches()) {
+            throw new Exception("La cédula debe tener solo números (entre 6 y 10 dígitos).");
+        }
         String nombre = validarTexto(
                 propietarioIngresado.getNombre(), "nombre del propietario", 120);
+        if (!NOMBRE.matcher(nombre).matches()) {
+            throw new Exception("El nombre solo puede tener letras y espacios.");
+        }
 
         if (ocupacionRepository
                 .findByVehiculoPlacaAndFechaHoraSalidaIsNull(
@@ -121,17 +154,6 @@ public class ServicioParqueadero {
         TipoVehiculo tipoParaCelda = vehiculoBD == null
                 ? tipo
                 : vehiculoBD.getTipo();
-        List<Celda> disponibles =
-                celdaRepository.findByTipoAsignadoAndDisponibleTrue(
-                        tipoParaCelda
-                );
-        if (disponibles.isEmpty()) {
-            throw new Exception(
-                    "No hay celdas disponibles para "
-                            + tipoParaCelda
-            );
-        }
-
         Usuario propietarioBD = usuarioRepository
                 .findByCedula(cedula)
                 .orElse(null);
@@ -157,7 +179,17 @@ public class ServicioParqueadero {
         }
         vehiculoBD = vehiculoRepository.save(vehiculoBD);
 
-        Celda celda = disponibles.get(0);
+        // Se bloquea la celda justo antes de asignarla para que dos operarios
+        // que registran a la vez nunca reciban la misma celda.
+        Celda celda = celdaRepository
+                .findFirstByTipoAsignadoAndDisponibleTrueOrderByCodigoAsc(
+                        tipoParaCelda)
+                .orElseThrow(
+                        () -> new Exception(
+                                "No hay celdas disponibles para "
+                                        + tipoParaCelda
+                        )
+                );
         celda.setDisponible(false);
         celda.setVehiculo(vehiculoBD);
         celdaRepository.save(celda);
@@ -192,8 +224,8 @@ public class ServicioParqueadero {
             String placa,
             Integer puertaSalida) throws Exception {
 
-        String placaNormalizada = validarTexto(placa, "placa", 10)
-                .toUpperCase(Locale.ROOT);
+        String placaNormalizada = normalizarPlaca(
+                validarTexto(placa, "placa", 10));
         if (puertaSalida != null
                 && puertaSalida != 1
                 && puertaSalida != 2) {
@@ -249,6 +281,35 @@ public class ServicioParqueadero {
         registrarSalida(
                 ocupacion.getVehiculo().getPlaca()
         );
+    }
+
+    // Historial de movimientos (HU-07 / RF-13): activas y finalizadas.
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> consultarHistorial() {
+
+        List<Map<String, Object>> historial = new ArrayList<>();
+
+        for (Ocupacion o : ocupacionRepository.findAllByOrderByFechaHoraEntradaDesc()) {
+            Map<String, Object> fila = new LinkedHashMap<>();
+            fila.put("placa", o.getVehiculo().getPlaca());
+            fila.put("tipo", o.getVehiculo().getTipo().name());
+            fila.put("propietario", o.getVehiculo().getPropietario().getNombre());
+            fila.put("celda", o.getCelda().getCodigo());
+            fila.put("estado", o.estaActiva() ? "ACTIVA" : "FINALIZADA");
+            fila.put("horaEntrada", o.getFechaHoraEntrada().toString());
+            fila.put("horaSalida", o.getFechaHoraSalida() == null
+                    ? null : o.getFechaHoraSalida().toString());
+            fila.put("puertaEntrada", o.getPuertaEntrada());
+            fila.put("puertaSalida", o.getPuertaSalida());
+            historial.add(fila);
+        }
+
+        return historial;
+    }
+
+    // Quita espacios y guiones y pasa a mayúsculas: "abc 123" -> "ABC123".
+    private String normalizarPlaca(String placa) {
+        return placa.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
     }
 
     private String validarTexto(String valor, String campo, int longitudMaxima)
