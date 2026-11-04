@@ -1,101 +1,63 @@
--- MySQL Workbench Forward Engineering
+-- Autos Colombia · Script de instalación (MySQL 8)
+-- Crea la base de datos y las 4 tablas completas, tal como las usa Spring Boot.
+-- Las 80 celdas (70 carro + 10 moto) las crea la aplicación sola al arrancar
+-- por primera vez (ServicioParqueadero.inicializarCeldas).
 
-SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
-SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+CREATE DATABASE IF NOT EXISTS autos_colombia
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE autos_colombia;
 
--- -----------------------------------------------------
--- Schema mydb
--- -----------------------------------------------------
--- -----------------------------------------------------
--- Schema autos_colombia
--- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS usuarios (
+  id_usuario  BIGINT       NOT NULL AUTO_INCREMENT,
+  nombre      VARCHAR(120) NOT NULL,
+  documento   VARCHAR(30)  NOT NULL,
+  rol         VARCHAR(20)  NULL DEFAULT 'OPERADOR',
+  PRIMARY KEY (id_usuario),
+  UNIQUE KEY uk_usuarios_documento (documento)
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Schema autos_colombia
--- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `autos_colombia` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
-USE `autos_colombia` ;
+CREATE TABLE IF NOT EXISTS vehiculos (
+  id_vehiculo   BIGINT      NOT NULL AUTO_INCREMENT,
+  placa         VARCHAR(10) NOT NULL,
+  marca         VARCHAR(60) NOT NULL,
+  color         VARCHAR(40) NOT NULL,
+  tipo_vehiculo ENUM('CARRO','MOTO') NOT NULL,
+  id_usuario    BIGINT      NOT NULL,
+  PRIMARY KEY (id_vehiculo),
+  UNIQUE KEY uk_vehiculos_placa (placa),
+  CONSTRAINT fk_vehiculos_usuario
+    FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario)
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `autos_colombia`.`usuarios`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `autos_colombia`.`usuarios` (
-  `id_usuario` BIGINT NOT NULL AUTO_INCREMENT,
-  `nombre` VARCHAR(120) NOT NULL,
-  `documento` VARCHAR(30) NOT NULL,
-  PRIMARY KEY (`id_usuario`),
-  UNIQUE INDEX `documento` (`documento` ASC) VISIBLE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 4
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+CREATE TABLE IF NOT EXISTS celdas (
+  id_celda      BIGINT      NOT NULL AUTO_INCREMENT,
+  codigo        VARCHAR(10) NOT NULL,
+  tipo_vehiculo ENUM('CARRO','MOTO') NOT NULL,
+  disponible    BOOLEAN     NOT NULL DEFAULT TRUE,
+  vehiculo_id   BIGINT      NULL,
+  PRIMARY KEY (id_celda),
+  UNIQUE KEY uk_celdas_codigo (codigo),
+  UNIQUE KEY uk_celdas_vehiculo (vehiculo_id),
+  CONSTRAINT fk_celdas_vehiculo
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos (id_vehiculo)
+) ENGINE=InnoDB;
 
-
--- -----------------------------------------------------
--- Table `autos_colombia`.`vehiculos`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `autos_colombia`.`vehiculos` (
-  `id_vehiculo` BIGINT NOT NULL AUTO_INCREMENT,
-  `placa` VARCHAR(10) NOT NULL,
-  `marca` VARCHAR(60) NOT NULL,
-  `color` VARCHAR(40) NOT NULL,
-  `tipo_vehiculo` ENUM('CARRO', 'MOTO') NOT NULL,
-  `id_usuario` BIGINT NOT NULL,
-  PRIMARY KEY (`id_vehiculo`),
-  UNIQUE INDEX `placa` (`placa` ASC) VISIBLE,
-  INDEX `fk_vehiculo_usuario` (`id_usuario` ASC) VISIBLE,
-  CONSTRAINT `fk_vehiculo_usuario`
-    FOREIGN KEY (`id_usuario`)
-    REFERENCES `autos_colombia`.`usuarios` (`id_usuario`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 5
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `autos_colombia`.`celdas`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `autos_colombia`.`celdas` (
-  `id_celda` BIGINT NOT NULL AUTO_INCREMENT,
-  `codigo` VARCHAR(10) NOT NULL,
-  `tipo_vehiculo` ENUM('CARRO', 'MOTO') NOT NULL,
-  `disponible` TINYINT(1) NOT NULL DEFAULT '1',
-  `vehiculo_id` BIGINT NULL DEFAULT NULL,
-  PRIMARY KEY (`id_celda`),
-  UNIQUE INDEX `codigo` (`codigo` ASC) VISIBLE,
-  UNIQUE INDEX `UK_3tkh8y7c1uvwg3sl762wi8pg4` (`vehiculo_id` ASC) VISIBLE,
-  CONSTRAINT `FK3plsa3qclnr01ejyp3x3cal4v`
-    FOREIGN KEY (`vehiculo_id`)
-    REFERENCES `autos_colombia`.`vehiculos` (`id_vehiculo`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 143
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `autos_colombia`.`ocupaciones`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `autos_colombia`.`ocupaciones` (
-  `id_ocupacion` BIGINT NOT NULL AUTO_INCREMENT,
-  `id_vehiculo` BIGINT NOT NULL,
-  `id_celda` BIGINT NOT NULL,
-  `fecha_hora_entrada` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `fecha_hora_salida` DATETIME NULL DEFAULT NULL,
-  `puerta_entrada` INT NOT NULL,
-  `puerta_salida` INT NULL DEFAULT NULL,
-  PRIMARY KEY (`id_ocupacion`),
-  INDEX `idx_ocupacion_vehiculo` (`id_vehiculo` ASC) VISIBLE,
-  INDEX `idx_ocupacion_celda` (`id_celda` ASC) VISIBLE,
-  INDEX `idx_ocupacion_salida` (`fecha_hora_salida` ASC) VISIBLE,
-  CONSTRAINT `fk_ocupacion_celda`
-    FOREIGN KEY (`id_celda`)
-    REFERENCES `autos_colombia`.`celdas` (`id_celda`),
-  CONSTRAINT `fk_ocupacion_vehiculo`
-    FOREIGN KEY (`id_vehiculo`)
-    REFERENCES `autos_colombia`.`vehiculos` (`id_vehiculo`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 12
-DEF
+CREATE TABLE IF NOT EXISTS ocupaciones (
+  id_ocupacion        BIGINT   NOT NULL AUTO_INCREMENT,
+  id_vehiculo         BIGINT   NOT NULL,
+  id_celda            BIGINT   NOT NULL,
+  fecha_hora_entrada  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_hora_salida   DATETIME NULL,
+  puerta_entrada      INT      NOT NULL,
+  puerta_salida       INT      NULL,
+  PRIMARY KEY (id_ocupacion),
+  KEY idx_ocupaciones_entrada (fecha_hora_entrada),
+  KEY idx_ocupaciones_salida (fecha_hora_salida),
+  KEY idx_ocupaciones_vehiculo (id_vehiculo, fecha_hora_salida),
+  CONSTRAINT fk_ocupaciones_vehiculo
+    FOREIGN KEY (id_vehiculo) REFERENCES vehiculos (id_vehiculo),
+  CONSTRAINT fk_ocupaciones_celda
+    FOREIGN KEY (id_celda) REFERENCES celdas (id_celda),
+  CONSTRAINT ck_puerta_entrada CHECK (puerta_entrada IN (1, 2)),
+  CONSTRAINT ck_puerta_salida  CHECK (puerta_salida IS NULL OR puerta_salida IN (1, 2))
+) ENGINE=InnoDB;
