@@ -108,9 +108,12 @@ function cargarCeldas() {
 
             celdas.forEach(celda => {
                 const tr = document.createElement('tr');
-                const estadoBadge = !celda.disponible 
-                    ? '<span class="badge bg-danger">Ocupada</span>' 
-                    : '<span class="badge bg-success">Disponible</span>';
+                // El estado lo calcula el servidor: DISPONIBLE, OCUPADA o FUERA_DE_SERVICIO
+                const estadoBadge = celda.estado === 'FUERA_DE_SERVICIO'
+                    ? '<span class="badge bg-secondary">Fuera de servicio</span>'
+                    : (celda.estado === 'OCUPADA'
+                        ? '<span class="badge bg-danger">Ocupada</span>'
+                        : '<span class="badge bg-success">Disponible</span>');
 
                 const placa = celda.vehiculo ? celda.vehiculo.placa : '';
 
@@ -121,7 +124,7 @@ function cargarCeldas() {
                     <td>${placa ? esc(placa) : '-'}</td>
                     <td>${celda.vehiculo && celda.vehiculo.propietario ? esc(celda.vehiculo.propietario.nombre) : '-'}</td>
                     <td>
-                        ${!celda.disponible ? `<button class="btn btn-sm btn-outline-danger" data-codigo="${esc(celda.codigo)}" data-placa="${esc(placa)}" onclick="pedirSalida(this)">Salida</button>` : '-'}
+                        ${celda.estado === 'OCUPADA' ? `<button class="btn btn-sm btn-outline-danger" data-codigo="${esc(celda.codigo)}" data-placa="${esc(placa)}" onclick="pedirSalida(this)">Salida</button>` : '-'}
                     </td>
                 `;
                 tbody.appendChild(tr);

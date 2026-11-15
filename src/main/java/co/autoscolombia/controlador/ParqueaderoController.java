@@ -2,6 +2,7 @@ package co.autoscolombia.controlador;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.autoscolombia.dominio.Celda;
@@ -64,9 +66,16 @@ public class ParqueaderoController {
     }
 
     // 2. Envía la lista de todas las celdas para llenar la tabla
+    // (HU-13 y HU-14) Sin parámetros devuelve todas; con tipo y/o estado, las filtra.
     @GetMapping("/celdas")
-    public List<Celda> obtenerCeldas() {
-        return celdaRepository.findAll();
+    public ResponseEntity<Object> obtenerCeldas(
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String estado) {
+        try {
+            return ResponseEntity.ok(servicioParqueadero.consultarCeldas(tipo, estado));
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
     }
 
     // Historial de movimientos (HU-07): ocupaciones activas y finalizadas
@@ -163,5 +172,90 @@ public class ParqueaderoController {
             respuesta.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(respuesta);
         }
+    }
+
+    // =====================================================================
+    // Iteración 2 · Gestión de usuarios
+    // =====================================================================
+
+    // HU-09: registrar usuario
+    @PostMapping("/usuarios")
+    public ResponseEntity<Object> registrarUsuario(@RequestBody Map<String, String> datos) {
+        try {
+            Usuario u = servicioParqueadero.registrarUsuario(
+                    datos.get("cedula"), datos.get("nombre"));
+            return ResponseEntity.ok(respuestaUsuario("Usuario registrado y activo.", u));
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
+    }
+
+    // HU-10: buscar por cédula o nombre. Lista vacía = "Usuario no encontrado"
+    @GetMapping("/usuarios")
+    public ResponseEntity<Object> buscarUsuarios(@RequestParam String criterio) {
+        try {
+            return ResponseEntity.ok(servicioParqueadero.buscarUsuarios(criterio));
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
+    }
+
+    // HU-11: modificar nombre y/o cédula del usuario identificado por {cedula}
+    @PostMapping("/usuarios/{cedula}/modificar")
+    public ResponseEntity<Object> modificarUsuario(@PathVariable String cedula,
+                                                   @RequestBody Map<String, String> datos) {
+        try {
+            Usuario u = servicioParqueadero.modificarUsuario(
+                    cedula, datos.get("cedula"), datos.get("nombre"));
+            return ResponseEntity.ok(respuestaUsuario("Cambios guardados.", u));
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
+    }
+
+    // HU-12: desactivar usuario (baja lógica)
+    @PostMapping("/usuarios/{cedula}/desactivar")
+    public ResponseEntity<Object> desactivarUsuario(@PathVariable String cedula) {
+        try {
+            Usuario u = servicioParqueadero.desactivarUsuario(cedula);
+            return ResponseEntity.ok(respuestaUsuario(
+                    "Usuario desactivado. Su historial se conserva.", u));
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
+    }
+
+    // =====================================================================
+    // Iteración 2 · Gestión de celdas
+    // =====================================================================
+
+    // HU-15 y HU-16: cuerpo {"accion": "FUERA_DE_SERVICIO"} o {"accion": "HABILITAR"}
+    @PostMapping("/celdas/{codigo}/estado")
+    public ResponseEntity<Object> cambiarEstadoCelda(@PathVariable String codigo,
+                                                     @RequestBody Map<String, String> datos) {
+        try {
+            String mensaje = servicioParqueadero.cambiarEstadoCelda(codigo, datos.get("accion"));
+            Map<String, Object> respuesta = new LinkedHashMap<>();
+            respuesta.put("mensaje", mensaje);
+            respuesta.put("celda", codigo.trim().toUpperCase(Locale.ROOT));
+            return ResponseEntity.ok(respuesta);
+        } catch (Exception e) {
+            return respuestaError(e);
+        }
+    }
+
+    private Map<String, Object> respuestaUsuario(String mensaje, Usuario u) {
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("mensaje", mensaje);
+        respuesta.put("cedula", u.getCedula());
+        respuesta.put("nombre", u.getNombre());
+        respuesta.put("activo", u.isActivo());
+        return respuesta;
+    }
+
+    private ResponseEntity<Object> respuestaError(Exception e) {
+        Map<String, Object> respuesta = new HashMap<>();
+        respuesta.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(respuesta);
     }
 }

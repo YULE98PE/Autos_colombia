@@ -12,6 +12,7 @@ import co.autoscolombia.repositorio.VehiculoRepository;
 
 import jakarta.annotation.PostConstruct;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 @Service
@@ -157,10 +159,23 @@ public class ServicioParqueadero {
         Usuario propietarioBD = usuarioRepository
                 .findByCedula(cedula)
                 .orElse(null);
-        if (propietarioBD == null) {
-            propietarioBD = usuarioRepository.save(
-                    new Usuario(cedula, nombre)
+        if (propietarioBD != null && !propietarioBD.isActivo()) {
+            throw new Exception(
+                    "El usuario con cédula " + cedula
+                            + " está inactivo y no puede registrar ingresos."
             );
+        }
+        if (propietarioBD == null) {
+            try {
+                propietarioBD = usuarioRepository.saveAndFlush(
+                        new Usuario(cedula, nombre)
+                );
+            } catch (DataIntegrityViolationException e) {
+                throw new Exception(
+                        "Otro operario está registrando al mismo propietario "
+                                + "en este momento. Intenta de nuevo."
+                );
+            }
         } else if (!propietarioBD.getNombre().equals(nombre)) {
             propietarioBD.setNombre(nombre);
             propietarioBD = usuarioRepository.save(propietarioBD);
@@ -177,7 +192,14 @@ public class ServicioParqueadero {
         } else {
             vehiculoBD.setPropietario(propietarioBD);
         }
-        vehiculoBD = vehiculoRepository.save(vehiculoBD);
+        try {
+            vehiculoBD = vehiculoRepository.saveAndFlush(vehiculoBD);
+        } catch (DataIntegrityViolationException e) {
+            throw new Exception(
+                    "El vehículo " + placa + " ya está adentro "
+                            + "(otro operario lo acaba de registrar)."
+            );
+        }
 
         // Se bloquea la celda justo antes de asignarla para que dos operarios
         // que registran a la vez nunca reciban la misma celda.
@@ -194,14 +216,24 @@ public class ServicioParqueadero {
         celda.setVehiculo(vehiculoBD);
         celdaRepository.save(celda);
 
-        ocupacionRepository.save(
-                new Ocupacion(
-                        vehiculoBD,
-                        celda,
-                        LocalDateTime.now(),
-                        puertaIngreso
-                )
-        );
+        // La base de datos solo permite UNA ocupación activa por vehículo y por
+        // celda (índices únicos). Si otro operario registró la misma placa en el
+        // mismo instante, MySQL rechaza la segunda y aquí se explica con claridad.
+        try {
+            ocupacionRepository.saveAndFlush(
+                    new Ocupacion(
+                            vehiculoBD,
+                            celda,
+                            LocalDateTime.now(),
+                            puertaIngreso
+                    )
+            );
+        } catch (DataIntegrityViolationException e) {
+            throw new Exception(
+                    "El vehículo " + placa + " ya está adentro "
+                            + "(otro operario lo acaba de registrar)."
+            );
+        }
 
         System.out.println(
                 "[PUERTA " + puertaIngreso + "] Vehículo "
@@ -305,6 +337,210 @@ public class ServicioParqueadero {
         }
 
         return historial;
+    }
+
+    // =====================================================================
+    // Iteración 2 · Gestión de usuarios (HU-09 a HU-12)
+    // =====================================================================
+
+    // HU-09: registrar usuario (queda activo).
+    @Transactional(rollbackFor = Exception.class)
+    public Usuario registrarUsuario(String cedula, String nombre)
+            throws Exception {
+
+        String ced = validarCedula(cedula);
+        String nom = validarNombre(nombre);
+
+        if (usuarioRepository.findByCedula(ced).isPresent()) {
+            throw new Exception("Ya existe un usuario con la cédula " + ced + ".");
+        }
+        try {
+            return usuarioRepository.saveAndFlush(new Usuario(ced, nom));
+        } catch (DataIntegrityViolationException e) {
+            throw new Exception("Ya existe un usuario con la cédula " + ced + ".");
+        }
+    }
+
+    // HU-10: buscar por cédula exacta o por nombre (parcial). Lista vacía = sin coincidencias.
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> buscarUsuarios(String criterio)
+            throws Exception {
+
+        String texto = validarTexto(criterio, "la cédula o el nombre a buscar", 120);
+
+        List<Usuario> encontrados = new ArrayList<>();
+        usuarioRepository.findByCedula(texto).ifPresent(encontrados::add);
+        for (Usuario u : usuarioRepository
+                .findByNombreContainingIgnoreCaseOrderByNombreAsc(texto)) {
+            boolean repetido = encontrados.stream()
+                    .anyMatch(e -> e.getId().equals(u.getId()));
+            if (!repetido) {
+                encontrados.add(u);
+            }
+        }
+
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        for (Usuario u : encontrados) {
+            Map<String, Object> fila = new LinkedHashMap<>();
+            fila.put("cedula", u.getCedula());
+            fila.put("nombre", u.getNombre());
+            fila.put("activo", u.isActivo());
+            fila.put("vehiculos", vehiculoRepository
+                    .findByPropietarioId(u.getId())
+                    .stream()
+                    .map(Vehiculo::getPlaca)
+                    .collect(Collectors.toList()));
+            resultado.add(fila);
+        }
+        return resultado;
+    }
+
+    // HU-11: modificar nombre y/o cédula de un usuario existente.
+    @Transactional(rollbackFor = Exception.class)
+    public Usuario modificarUsuario(
+            String cedulaActual,
+            String cedulaNueva,
+            String nombreNuevo) throws Exception {
+
+        Usuario usuario = usuarioRepository
+                .findByCedula(validarCedula(cedulaActual))
+                .orElseThrow(() -> new Exception("Usuario no encontrado."));
+
+        String ced = validarCedula(cedulaNueva);
+        String nom = validarNombre(nombreNuevo);
+
+        if (usuarioRepository.existsByCedulaAndIdNot(ced, usuario.getId())) {
+            throw new Exception("Esa cédula ya pertenece a otro usuario.");
+        }
+
+        usuario.setCedula(ced);
+        usuario.setNombre(nom);
+        try {
+            return usuarioRepository.saveAndFlush(usuario);
+        } catch (DataIntegrityViolationException e) {
+            throw new Exception("Esa cédula ya pertenece a otro usuario.");
+        }
+    }
+
+    // HU-12: desactivar (baja lógica). No se borra nada: el historial se conserva.
+    @Transactional(rollbackFor = Exception.class)
+    public Usuario desactivarUsuario(String cedula) throws Exception {
+
+        Usuario usuario = usuarioRepository
+                .findByCedula(validarCedula(cedula))
+                .orElseThrow(() -> new Exception("Usuario no encontrado."));
+
+        if (ocupacionRepository
+                .existsByVehiculoPropietarioIdAndFechaHoraSalidaIsNull(
+                        usuario.getId())) {
+            throw new Exception(
+                    "El usuario " + usuario.getCedula()
+                            + " tiene un vehículo dentro del parqueadero. "
+                            + "Registra primero la salida."
+            );
+        }
+
+        usuario.setActivo(false);
+        return usuarioRepository.save(usuario);
+    }
+
+    // =====================================================================
+    // Iteración 2 · Gestión de celdas (HU-13 a HU-16)
+    // =====================================================================
+
+    // HU-13 y HU-14: consultar las celdas; tipo y estado son filtros opcionales.
+    // tipo: CARRO | MOTO | vacío.  estado: DISPONIBLE | OCUPADA | FUERA_DE_SERVICIO | vacío.
+    @Transactional(readOnly = true)
+    public List<Celda> consultarCeldas(String tipo, String estado)
+            throws Exception {
+
+        TipoVehiculo tipoFiltro = null;
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoFiltro = TipoVehiculo.valueOf(
+                        tipo.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                throw new Exception("El tipo de celda debe ser CARRO o MOTO.");
+            }
+        }
+
+        String estadoFiltro = null;
+        if (estado != null && !estado.isBlank()) {
+            estadoFiltro = estado.trim().toUpperCase(Locale.ROOT);
+            if (!estadoFiltro.equals("DISPONIBLE")
+                    && !estadoFiltro.equals("OCUPADA")
+                    && !estadoFiltro.equals("FUERA_DE_SERVICIO")) {
+                throw new Exception(
+                        "El estado debe ser DISPONIBLE, OCUPADA o FUERA_DE_SERVICIO.");
+            }
+        }
+
+        final TipoVehiculo t = tipoFiltro;
+        final String e = estadoFiltro;
+        return celdaRepository.findAllByOrderByCodigoAsc().stream()
+                .filter(c -> t == null || c.getTipoAsignado() == t)
+                .filter(c -> e == null || c.getEstado().equals(e))
+                .collect(Collectors.toList());
+    }
+
+    // HU-15 y HU-16: poner fuera de servicio o habilitar una celda.
+    // accion: FUERA_DE_SERVICIO | HABILITAR. Devuelve el mensaje para el operador.
+    @Transactional(rollbackFor = Exception.class)
+    public String cambiarEstadoCelda(String codigo, String accion)
+            throws Exception {
+
+        String cod = validarTexto(codigo, "código de celda", 10)
+                .toUpperCase(Locale.ROOT);
+        Celda celda = celdaRepository
+                .findByCodigo(cod)
+                .orElseThrow(() -> new Exception("No existe la celda " + cod + "."));
+
+        String op = accion == null ? "" : accion.trim().toUpperCase(Locale.ROOT);
+
+        if (op.equals("FUERA_DE_SERVICIO")) {
+            if (celda.isFueraDeServicio()) {
+                return "La celda " + cod + " ya estaba fuera de servicio. No hubo cambios.";
+            }
+            if (!celda.isDisponible()) {
+                throw new Exception(
+                        "La celda " + cod + " está ocupada. "
+                                + "Registra primero la salida del vehículo.");
+            }
+            celda.setFueraDeServicio(true);
+            celda.setDisponible(false);
+            celdaRepository.save(celda);
+            return "La celda " + cod + " quedó fuera de servicio.";
+        }
+
+        if (op.equals("HABILITAR")) {
+            if (!celda.isFueraDeServicio()) {
+                return "La celda " + cod + " no está fuera de servicio. No hubo cambios.";
+            }
+            celda.setFueraDeServicio(false);
+            celda.setDisponible(true);
+            celdaRepository.save(celda);
+            return "La celda " + cod + " fue habilitada y vuelve a asignarse.";
+        }
+
+        throw new Exception("La acción debe ser FUERA_DE_SERVICIO o HABILITAR.");
+    }
+
+    // Validaciones de usuario (mismas reglas del ingreso de vehículos).
+    private String validarCedula(String cedula) throws Exception {
+        String ced = validarTexto(cedula, "cédula", 30);
+        if (!CEDULA.matcher(ced).matches()) {
+            throw new Exception(
+                    "La cédula debe tener solo números (entre 6 y 10 dígitos).");
+        }
+        return ced;
+    }
+
+    private String validarNombre(String nombre) throws Exception {
+        String nom = validarTexto(nombre, "el nombre", 120);
+        if (!NOMBRE.matcher(nom).matches()) {
+            throw new Exception("El nombre solo puede tener letras y espacios.");
+        }
+        return nom;
     }
 
     // Quita espacios y guiones y pasa a mayúsculas: "abc 123" -> "ABC123".

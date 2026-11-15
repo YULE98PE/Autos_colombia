@@ -1,11 +1,11 @@
 package co.autoscolombia.repositorio;
 
-import co.autoscolombia.dominio.Ocupacion;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
-import java.util.Optional;
+import co.autoscolombia.dominio.Ocupacion;
 
 public interface OcupacionRepository extends JpaRepository<Ocupacion, Long> {
 
@@ -17,4 +17,7 @@ public interface OcupacionRepository extends JpaRepository<Ocupacion, Long> {
 
     // Historial completo (HU-07): activas y finalizadas, la más reciente primero.
     List<Ocupacion> findAllByOrderByFechaHoraEntradaDesc();
+
+    // HU-12: ¿el usuario tiene algún vehículo adentro del parqueadero?
+    boolean existsByVehiculoPropietarioIdAndFechaHoraSalidaIsNull(Long idUsuario);
 }

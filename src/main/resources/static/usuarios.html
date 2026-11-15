@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios | Autos Colombia</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Efecto de animación para el carro */
+        .carro-animado {
+            width: 250px;
+            transition: transform 0.8s ease-in-out;
+            cursor: pointer;
+        }
+        .carro-animado:hover {
+            transform: translateX(100px); /* El carro se mueve a la derecha al pasar el mouse */
+        }
+        /* Estilos para las tarjetas y paneles */
+        .tarjeta-premium {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .encabezado-app {
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            color: white;
+            padding: 2rem 0;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="encabezado-app text-center shadow">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="text-start">
+                <h1 class="fw-bold">Autos Colombia</h1>
+                <p class="mb-0 fs-5">Sistema Inteligente de Parqueadero</p>
+            </div>
+            <div>
+                <img src="https://cdn-icons-png.flaticon.com/512/3202/3202926.png" alt="Carro animado" class="carro-animado">
+            </div>
+        </div>
+    </header>
+
+    <div class="container mb-5">
+
+        <div class="card tarjeta-premium">
+            <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                <span>👤 Gestión de usuarios</span>
+                <a href="/" class="btn btn-sm btn-outline-light">← Volver al panel</a>
+            </div>
+
+            <div class="card-body bg-white border-bottom">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <form id="form-buscar" class="d-flex flex-wrap align-items-center gap-2">
+                        <input type="search" class="form-control bg-light" id="criterio" placeholder="Cédula o nombre" style="width: 300px;">
+                        <button type="submit" class="btn btn-primary fw-bold">Buscar</button>
+                    </form>
+                    <button type="button" class="btn btn-success fw-bold" id="btn-nuevo">+ Nuevo usuario</button>
+                </div>
+            </div>
+
+            <div id="mensaje" class="px-3 pt-3"></div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cédula</th>
+                            <th>Nombre</th>
+                            <th>Vehículos</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-usuarios">
+                        <tr><td colspan="5" class="text-center py-3 text-muted">Busca por cédula o nombre para ver los usuarios.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Formulario: registrar (HU-09) y modificar (HU-11) -->
+    <div class="modal fade" id="modal-usuario" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 15px;">
+                <form id="form-usuario" novalidate>
+                    <div class="modal-header bg-dark text-white" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold" id="titulo-usuario">Registrar usuario</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="u-cedula" class="form-label">Cédula</label>
+                            <input type="text" class="form-control bg-light" id="u-cedula" maxlength="10" inputmode="numeric" autocomplete="off">
+                            <div class="invalid-feedback" id="err-cedula"></div>
+                        </div>
+                        <div class="mb-1">
+                            <label for="u-nombre" class="form-label">Nombre completo</label>
+                            <input type="text" class="form-control bg-light" id="u-nombre" maxlength="120" autocomplete="off">
+                            <div class="invalid-feedback" id="err-nombre"></div>
+                        </div>
+                        <div class="text-danger small mt-2 d-none" id="err-general"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold" id="btn-guardar">Guardar usuario</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmar desactivación (HU-12) -->
+    <div class="modal fade" id="modal-desactivar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center p-4" style="border-radius: 20px;">
+                <h3 class="fw-bold mt-2">¿Desactivar usuario?</h3>
+                <p class="text-muted" id="texto-desactivar"></p>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger fw-bold" id="btn-confirmar-desactivar">Desactivar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error "No se pudo completar" -->
+    <div class="modal fade" id="modal-error" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center p-4" style="border-radius: 20px;">
+                <h3 class="fw-bold mt-2">No se pudo completar</h3>
+                <p class="text-muted" id="texto-error"></p>
+                <div class="d-flex justify-content-center mt-2">
+                    <button type="button" class="btn btn-primary fw-bold" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/usuarios.js"></script>
+</body>
+</html>
