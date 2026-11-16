@@ -1,5 +1,6 @@
 -- Autos Colombia · Script de instalación (MySQL 8)
 -- Crea la base de datos y las 4 tablas completas, tal como las usa Spring Boot.
+-- Incluye la Iteración 2: usuarios.activo (baja lógica) y celdas.fuera_de_servicio.
 -- Las 80 celdas (70 carro + 10 moto) las crea la aplicación sola al arrancar
 -- por primera vez (ServicioParqueadero.inicializarCeldas).
 
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre      VARCHAR(120) NOT NULL,
   documento   VARCHAR(30)  NOT NULL,
   rol         VARCHAR(20)  NULL DEFAULT 'OPERADOR',
+  activo      TINYINT(1)   NOT NULL DEFAULT 1,
   PRIMARY KEY (id_usuario),
   UNIQUE KEY uk_usuarios_documento (documento)
 ) ENGINE=InnoDB;
@@ -34,6 +36,7 @@ CREATE TABLE IF NOT EXISTS celdas (
   codigo        VARCHAR(10) NOT NULL,
   tipo_vehiculo ENUM('CARRO','MOTO') NOT NULL,
   disponible    BOOLEAN     NOT NULL DEFAULT TRUE,
+  fuera_de_servicio TINYINT(1) NOT NULL DEFAULT 0,
   vehiculo_id   BIGINT      NULL,
   PRIMARY KEY (id_celda),
   UNIQUE KEY uk_celdas_codigo (codigo),
@@ -50,7 +53,17 @@ CREATE TABLE IF NOT EXISTS ocupaciones (
   fecha_hora_salida   DATETIME NULL,
   puerta_entrada      INT      NOT NULL,
   puerta_salida       INT      NULL,
+  -- Columnas calculadas: guardan el id mientras la ocupación está ACTIVA
+  -- (sin fecha de salida) y quedan en NULL cuando termina. Con el índice único
+  -- se garantiza una sola ocupación activa por vehículo y por celda, aunque
+  -- dos operarios registren al mismo tiempo.
+  vehiculo_activo     BIGINT GENERATED ALWAYS AS
+                        (IF(fecha_hora_salida IS NULL, id_vehiculo, NULL)) STORED,
+  celda_activa        BIGINT GENERATED ALWAYS AS
+                        (IF(fecha_hora_salida IS NULL, id_celda, NULL)) STORED,
   PRIMARY KEY (id_ocupacion),
+  UNIQUE KEY uk_un_activo_por_vehiculo (vehiculo_activo),
+  UNIQUE KEY uk_un_activo_por_celda (celda_activa),
   KEY idx_ocupaciones_entrada (fecha_hora_entrada),
   KEY idx_ocupaciones_salida (fecha_hora_salida),
   KEY idx_ocupaciones_vehiculo (id_vehiculo, fecha_hora_salida),
