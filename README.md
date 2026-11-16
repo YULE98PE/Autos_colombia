@@ -35,9 +35,9 @@ Aplicación web para administrar el ingreso y la salida de vehículos de un parq
 
 ## Configuración
 
-1. Crea las tablas ejecutando [`script.sql`](script.sql) desde MySQL Workbench o
-   desde el cliente MySQL. El script crea la base de datos `autos_colombia` y
-   las tablas requeridas.
+1. Crea las tablas ejecutando [`bd/instalacion.sql`](bd/instalacion.sql) desde
+   MySQL Workbench o desde el cliente MySQL. El script crea la base de datos
+   `autos_colombia` y las tablas requeridas.
 2. Configura la conexión en
    [`application.properties`](src/main/resources/application.properties):
 
